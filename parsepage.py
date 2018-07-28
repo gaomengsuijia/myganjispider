@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 __author__ = "hulinjun"
-
 import requests
 from bs4 import BeautifulSoup
 from Mongomanage import Manangemongo
@@ -8,11 +7,11 @@ from category import HEADERS
 from requests.exceptions import ConnectionError
 from config import COUNT
 from poxyip import poxyip
-
+import re
 
 man = Manangemongo('ganji','shopdetailurl')
+mangoodinfo = Manangemongo('ganji','goodinfo')
 poxy = None
-
 
 class Parsepage(object):
     """
@@ -41,6 +40,8 @@ class Parsepage(object):
                 if req.status_code == 302:#爬虫被限制了，这个时候需要换个代理继续去访问
                     poxy = poxyip()
                     return self.getsoup(url)
+                if req.status_code == 404:#商品url不可用
+                    return None
                 soup = BeautifulSoup(req.text,'lxml')
                 return soup
             except ConnectionError as e:
@@ -83,6 +84,14 @@ class Parsepage(object):
 
 
 
+    def saveto_mongo(self,data):
+        """
+        将商品详情数据保存到mongo中
+        :param data:
+        :return:
+        """
+        mangoodinfo.insert(data)
+
 
     def get_shopinfo(self,shop_detail_url):
         """
@@ -90,11 +99,38 @@ class Parsepage(object):
         :param shop_detail_url:
         :return:
         """
-        pass
-
-
+        soup = self.getsoup(shop_detail_url)
+        if soup:
+            soldout_btn = soup.select('.soldout_btn')
+            if soldout_btn:#商品下架
+                return
+            #提取数字
+            parten = re.compile(r'\d+')
+            good_title = soup.select('.info_titile')[0].get_text()
+            price_now = soup.select('.price_now > i')[0].get_text()
+            price_ori = soup.select('.price_ori')
+            #如果没有原价就默认为''
+            price_ori = parten.findall(price_ori[0].get_text())[0] if price_ori else ''
+            address = soup.select('.palce_li > span > i')[0].get_text()
+            seller = soup.select('.personal_name')[0].get_text()
+            #如果没有浏览量就默认为''
+            look_time = soup.select('.look_time')
+            look_time = parten.findall(look_time[0].get_text())[0] if look_time else ''
+            want_person = soup.select('.want_person')[0].get_text()
+            want_person = parten.findall(want_person)[0]
+            data = {
+                "good_title":good_title,
+                "price_now":price_now,
+                "price_ori":price_ori,
+                "address":address,
+                "seller":seller,
+                "look_time":look_time,
+                "want_person":want_person
+            }
+            self.saveto_mongo(data)
 
 
 if __name__ == '__main__':
     pa = Parsepage()
-    pa.get_shoplist(2)
+    # pa.get_shopinfo("http://zhuanzhuan.ganji.com/detail/1022661804963479566z.shtml")
+    x = pa.get_shopinfo("http://zhuanzhuan.ganji.com/detail/1021954963855392786z.shtml")

@@ -24,7 +24,10 @@ class Manangemongo(object):
         :param dic:
         :return:
         """
-        self.collection.insert(dic)
+        try:
+            self.collection.insert(dic)
+        except Exception:
+            raise Exception("保存到mongo失败")
 
 
 
@@ -60,7 +63,10 @@ class Manangemongo(object):
 
 
 
-
 if __name__ == '__main__':
-    m = Manangemongo()
-    m.insert({"name":"xiaotu","age":100})
+    man = Manangemongo('ganji', 'shopdetailurl')
+    man1 = Manangemongo('ganji', 'goodinfo')
+    all_ship = man.find().count()
+    goodinfo = man1.find().count()
+    print(all_ship)
+    print(goodinfo)
